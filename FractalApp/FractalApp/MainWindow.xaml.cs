@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics;
 using System.Linq.Expressions;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
@@ -23,19 +24,76 @@ namespace FractalApp
         private double _real { get; set; }
         private double _imaginary { get; set; }
         private int _iterations { get; set; }
+        private Stopwatch _cSharpTimer;
+        private Stopwatch _asmTimer;
 
-        private Timer _cSharpTimer;
+        [DllImport("JuliaFractal.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern void JuliaFractalASM(
+            double re,
+            double im,
+            int iterations,
+            int width,
+            int height,
+            [Out] byte[] buffer
+        );
 
-        private Timer _asmTimer ;
         public MainWindow()
         {
             InitializeComponent();
             ThreadsSlider.Value = Environment.ProcessorCount;
+            _cSharpTimer = new Stopwatch();
+            _asmTimer = new Stopwatch();
         }
+
+        private byte[] GenerateFractalParallel(double re, double im, int iterations, int width, int height, int threads)
+        {
+            byte[] result = new byte[width * height];
+            double scaleX = 3.0 / (double)width;
+            double scaleY = 2.0 / (double)height;
+            double centerX = (double)width / 2.0;
+            double centerY = (double)height / 2.0;
+            int segmentHeight = height / threads;
+
+            Task[] tasks = new Task[threads];
+
+            for (int threadIndex = 0; threadIndex < threads; threadIndex++)
+            {
+                int localThreadIndex = threadIndex;
+                tasks[threadIndex] = Task.Run(() =>
+                {
+                    int startY = localThreadIndex * segmentHeight;
+                    int endY = (localThreadIndex == threads - 1) ? height : (startY + segmentHeight);
+
+                    // Tworzymy bufor tylko dla tego segmentu
+                    int segmentSize = (endY - startY) * width;
+                    byte[] segmentBuffer = new byte[segmentSize];
+
+                    JuliaFractalASM(
+                        re, im, iterations,
+                        width,
+                        endY - startY,
+                        segmentBuffer
+                    );
+
+                    for (int y = 0; y < (endY - startY); y++)
+                    {
+                        for (int x = 0; x < width; x++)
+                        {
+                            int sourceIndex = y * width + x;
+                            int targetIndex = (y + startY) * width + x;
+                            result[targetIndex] = segmentBuffer[sourceIndex];
+                        }
+                    }
+                });
+            }
+
+            Task.WaitAll(tasks);
+
+            return result;
+        }
+
         private BitmapSource ConvertToImage(byte[,] data)
         {
-
-            // Pobierz wymiary
             int width = data.GetLength(0);
             int height = data.GetLength(1);
 
@@ -76,12 +134,39 @@ namespace FractalApp
             );
         }
 
+        private BitmapSource ConvertToImageFromBuffer(byte[] buffer, int width, int height)
+        {
+            if (width <= 0 || height <= 0)
+            {
+                throw new ArgumentException("Image dimensions must be greater than 0!");
+            }
+
+            var pixels = new byte[width * height * 4];
+
+            for (int i = 0; i < buffer.Length; i++)
+            {
+                int pixelIndex = i * 4;
+                pixels[pixelIndex] = buffer[i];     // B
+                pixels[pixelIndex + 1] = buffer[i]; // G
+                pixels[pixelIndex + 2] = buffer[i]; // R
+                pixels[pixelIndex + 3] = 255;       // Alpha
+            }
+
+            return BitmapSource.Create(
+                width, height,
+                96, 96,                // DPI
+                PixelFormats.Bgra32,   // Pixel format
+                null,                  // Color palette
+                pixels,                // Pixel data
+                width * 4              // Stride
+            );
+        }
+
 
         private async void StartButton_Click(object sender, RoutedEventArgs e)
         {
             _threads = (int)ThreadsSlider.Value;
 
-            // Pobierz parametry
             try
             {
                 _real = double.Parse(ReTextBox.Text.Replace(".", ","));
@@ -102,31 +187,27 @@ namespace FractalApp
                 if (CSharpRadioButton.IsChecked == true)
                 {
                     
-                    var stopwatch = Stopwatch.StartNew();
+                    _cSharpTimer = Stopwatch.StartNew();
 
                     var fractal = await Task.Run(() => JuliaFractalCSharp.GenerateFractal(_real, _imaginary, _iterations, width, height, _threads));
 
-                    stopwatch.Stop();
-                    CSharpTimeTextBox.Text = $"{stopwatch.ElapsedMilliseconds} ms";
+                    _cSharpTimer.Stop();
+                    CSharpTimeTextBox.Text = $"{_cSharpTimer.ElapsedMilliseconds} ms";
 
                     FractalImage.Source = ConvertToImage(fractal);
                 }
                 else if (AsmRadioButton.IsChecked == true)
                 {
-                    
-                    var stopwatch = Stopwatch.StartNew();
+                    _asmTimer = Stopwatch.StartNew();
 
-                    // TODO: logic for generating fractal in ASM
-                    await Task.Run(() =>
-                    {
-                        //var fractal = "";
-                        System.Threading.Thread.Sleep(100);
-                    });
+                    var buffer = await Task.Run(() =>
+                        GenerateFractalParallel(_real, _imaginary, _iterations, width, height, _threads)
+                    );
 
-                    stopwatch.Stop();
-                    AsmTimeTextBox.Text = $"{stopwatch.ElapsedMilliseconds} ms";
+                    _asmTimer.Stop();
+                    AsmTimeTextBox.Text = $"{_asmTimer.ElapsedMilliseconds} ms";
 
-                    //FractalImage.Source = ConvertToImage(fractal);
+                    FractalImage.Source = ConvertToImageFromBuffer(buffer, width, height);
                 }
             }
             catch (Exception ex)
