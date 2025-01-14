@@ -24,13 +24,15 @@ namespace FractalApp
         private double _imaginary { get; set; }
         private int _iterations { get; set; }
 
-        private Timer _cSharpTimer;
+        private Stopwatch _cSharpTimer;
 
-        private Timer _asmTimer ;
+        private Stopwatch _asmTimer ;
         public MainWindow()
         {
             InitializeComponent();
             ThreadsSlider.Value = Environment.ProcessorCount;
+            _cSharpTimer = new Stopwatch();
+            _asmTimer = new Stopwatch();
         }
         private BitmapSource ConvertToImage(byte[,] data)
         {
@@ -81,7 +83,6 @@ namespace FractalApp
         {
             _threads = (int)ThreadsSlider.Value;
 
-            // Pobierz parametry
             try
             {
                 _real = double.Parse(ReTextBox.Text.Replace(".", ","));
@@ -102,19 +103,19 @@ namespace FractalApp
                 if (CSharpRadioButton.IsChecked == true)
                 {
                     
-                    var stopwatch = Stopwatch.StartNew();
+                    _cSharpTimer = Stopwatch.StartNew();
 
                     var fractal = await Task.Run(() => JuliaFractalCSharp.GenerateFractal(_real, _imaginary, _iterations, width, height, _threads));
 
-                    stopwatch.Stop();
-                    CSharpTimeTextBox.Text = $"{stopwatch.ElapsedMilliseconds} ms";
+                    _cSharpTimer.Stop();
+                    CSharpTimeTextBox.Text = $"{_cSharpTimer.ElapsedMilliseconds} ms";
 
                     FractalImage.Source = ConvertToImage(fractal);
                 }
                 else if (AsmRadioButton.IsChecked == true)
                 {
                     
-                    var stopwatch = Stopwatch.StartNew();
+                    _asmTimer = Stopwatch.StartNew();
 
                     // TODO: logic for generating fractal in ASM
                     await Task.Run(() =>
@@ -123,8 +124,8 @@ namespace FractalApp
                         System.Threading.Thread.Sleep(100);
                     });
 
-                    stopwatch.Stop();
-                    AsmTimeTextBox.Text = $"{stopwatch.ElapsedMilliseconds} ms";
+                    _asmTimer.Stop();
+                    AsmTimeTextBox.Text = $"{_asmTimer.ElapsedMilliseconds} ms";
 
                     //FractalImage.Source = ConvertToImage(fractal);
                 }
