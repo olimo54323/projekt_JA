@@ -27,14 +27,14 @@ namespace FractalApp
         private Stopwatch _cSharpTimer;
         private Stopwatch _asmTimer;
 
-        [DllImport("JuliaFractal.dll", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void JuliaFractalASM(
+        [DllImport(@"C:\Users\wrobl\source\repos\projekt_JA\FractalApp\x64\Debug\FractalAsmLib.dll", CallingConvention = CallingConvention.StdCall)]
+        private static extern IntPtr JuliaFractalASM(
             double re,
             double im,
             int iterations,
             int width,
             int height,
-            [Out] byte[] buffer
+            int threads
         );
 
         public MainWindow()
@@ -45,53 +45,64 @@ namespace FractalApp
             _asmTimer = new Stopwatch();
         }
 
-        private byte[] GenerateFractalParallel(double re, double im, int iterations, int width, int height, int threads)
-        {
-            byte[] result = new byte[width * height];
-            double scaleX = 3.0 / (double)width;
-            double scaleY = 2.0 / (double)height;
-            double centerX = (double)width / 2.0;
-            double centerY = (double)height / 2.0;
-            int segmentHeight = height / threads;
+        //private byte[] GenerateFractalParallel(double re, double im, int iterations, int width, int height, int threads)
+        //{
+        //    byte[] result = new byte[width * height];
+        //    int segmentHeight = height / threads;
 
-            Task[] tasks = new Task[threads];
+        //    Task[] tasks = new Task[threads];
 
-            for (int threadIndex = 0; threadIndex < threads; threadIndex++)
-            {
-                int localThreadIndex = threadIndex;
-                tasks[threadIndex] = Task.Run(() =>
-                {
-                    int startY = localThreadIndex * segmentHeight;
-                    int endY = (localThreadIndex == threads - 1) ? height : (startY + segmentHeight);
+        //    for (int threadIndex = 0; threadIndex < threads; threadIndex++)
+        //    {
+        //        int localThreadIndex = threadIndex;
+        //        tasks[threadIndex] = Task.Run(() =>
+        //        {
+        //            try
+        //            {
+        //                // Oblicz zakres dla tego wątku
+        //                int startY = localThreadIndex * segmentHeight;
+        //                int endY = (localThreadIndex == threads - 1) ? height : (startY + segmentHeight);
+        //                int currentHeight = endY - startY;
 
-                    // Tworzymy bufor tylko dla tego segmentu
-                    int segmentSize = (endY - startY) * width;
-                    byte[] segmentBuffer = new byte[segmentSize];
+        //                // Bufor dla tego segmentu
+        //                byte[] segmentBuffer = new byte[width * currentHeight];
 
-                    JuliaFractalASM(
-                        re, im, iterations,
-                        width,
-                        endY - startY,
-                        segmentBuffer
-                    );
+        //                // Wywołaj asembler dla tego segmentu
+        //                int result = JuliaFractalASM(
+        //                    re, im, iterations,
+        //                    width, currentHeight,
+        //                    segmentBuffer
+        //                );
 
-                    for (int y = 0; y < (endY - startY); y++)
-                    {
-                        for (int x = 0; x < width; x++)
-                        {
-                            int sourceIndex = y * width + x;
-                            int targetIndex = (y + startY) * width + x;
-                            result[targetIndex] = segmentBuffer[sourceIndex];
-                        }
-                    }
-                });
-            }
+        //                if (result != 0)
+        //                {
+        //                    throw new Exception($"ASM returned error code: {result}");
+        //                }
 
-            Task.WaitAll(tasks);
+        //                // Skopiuj wyniki do głównego bufora
+        //                for (int y = 0; y < currentHeight; y++)
+        //                {
+        //                    Buffer.BlockCopy(
+        //                        segmentBuffer,           // źródło
+        //                        y * width,               // offset źródła
+        //                        result,                  // cel
+        //                        (y + startY) * width,    // offset celu
+        //                        width                    // ile bajtów kopiujemy
+        //                    );
+        //                }
+        //            }
+        //            catch (Exception ex)
+        //            {
+        //                MessageBox.Show($"Thread {localThreadIndex} error: {ex.Message}");
+        //                throw;
+        //            }
+        //        });
+        //    }
 
-            return result;
-        }
-
+        //    // Poczekaj na wszystkie wątki
+        //    Task.WaitAll(tasks);
+        //    return result;
+        //}
         private BitmapSource ConvertToImage(byte[,] data)
         {
             int width = data.GetLength(0);
@@ -172,6 +183,7 @@ namespace FractalApp
                 _real = double.Parse(ReTextBox.Text.Replace(".", ","));
                 _imaginary = double.Parse(ImTextBox.Text.Replace(".", ","));
                 _iterations = int.Parse(IterationsTextBox.Text);
+
             }
             catch (Exception ex)
             {
@@ -200,14 +212,31 @@ namespace FractalApp
                 {
                     _asmTimer = Stopwatch.StartNew();
 
-                    var buffer = await Task.Run(() =>
-                        GenerateFractalParallel(_real, _imaginary, _iterations, width, height, _threads)
-                    );
+                    try
+                    {
+                        byte[] buffer = new byte[width * height];
+                        IntPtr resultPtr = JuliaFractalASM(
+                            _real,       // re (double)
+                            _imaginary,  // im (double) 
+                            _iterations, // iterations (int)
+                            width,       // width (int)
+                            height,       // height (int)
+                            1
+                        );
+
+                        // Skopiowanie wyniku z powrotem
+                        Marshal.Copy(resultPtr, buffer, 0, buffer.Length);
+                        Marshal.FreeHGlobal(resultPtr);
+
+                        FractalImage.Source = ConvertToImageFromBuffer(buffer, width, height);
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show($"Error: {ex.Message}\n{ex.StackTrace}");
+                    }
 
                     _asmTimer.Stop();
                     AsmTimeTextBox.Text = $"{_asmTimer.ElapsedMilliseconds} ms";
-
-                    FractalImage.Source = ConvertToImageFromBuffer(buffer, width, height);
                 }
             }
             catch (Exception ex)
