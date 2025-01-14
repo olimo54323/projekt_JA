@@ -1,0 +1,2 @@
+LIBRARY FractalAsmLib
+EXPORTS GenerateFractal
