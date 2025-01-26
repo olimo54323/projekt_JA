@@ -1,2 +1,2 @@
 LIBRARY FractalAsmLib
-EXPORTS JuliaFractalASM
+EXPORTS GenerateJuliaFractalASM
