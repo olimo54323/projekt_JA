@@ -33,15 +33,15 @@ namespace FractalApp
 
         [DllImport(@"C:\Users\wrobl\source\repos\projekt_JA\FractalApp\x64\Debug\FractalAsmLib.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern void GenerateJuliaFractalASM(
-    byte[] result,        // tablica wynikowa
-    double re,           // część rzeczywista C
-    double im,           // część urojona C
-    int iterations,      // max iteracji
-    int startY,          // początek zakresu Y
-    int endY            // koniec zakresu Y
-);
+            byte[] result,        // tablica wynikowa
+            double re,           // część rzeczywista C
+            double im,           // część urojona C
+            int iterations,      // max iteracji
+            int startY,          // początek zakresu Y
+            int endY            // koniec zakresu Y
+        );
 
-        //        [DllImport(@"C:\Users\wrobl\source\repos\projekt_JA\FractalApp\x64\Debug\FractalAsmLib.dll", CallingConvention = CallingConvention.Cdecl)]
+        //        [DllImport(@"C:\Users\wrobl\source\repos\projekt_JA\FractalApp\x64\Release\FractalAsmLib.dll", CallingConvention = CallingConvention.Cdecl)]
         //        private static extern void GenerateJuliaFractalASM(
         //    byte[] result,        // tablica wynikowa
         //    double re,           // część rzeczywista C
@@ -93,7 +93,6 @@ namespace FractalApp
             Task.WaitAll(tasks);
             return result;
         }
-
         private BitmapSource ConvertToImage(byte[,] data)
         {
             int width = data.GetLength(0);
@@ -176,13 +175,13 @@ namespace FractalApp
 
             try
             {
-                //_real = double.Parse(ReTextBox.Text.Replace(".", ","));
-                //_imaginary = double.Parse(ImTextBox.Text.Replace(".", ","));
-                //_iterations = int.Parse(IterationsTextBox.Text);
+                _real = double.Parse(ReTextBox.Text.Replace(".", ","));
+                _imaginary = double.Parse(ImTextBox.Text.Replace(".", ","));
+                _iterations = int.Parse(IterationsTextBox.Text);
 
-                _real = 0.285;
-                _imaginary = 0.01;
-                _iterations = 100;
+                //_real = 0.285;
+                //_imaginary = 0.01;
+                //_iterations = 100;
 
             }
             catch (Exception ex)
