@@ -14,7 +14,6 @@ using System.Windows.Shapes;
 using FractalCSharpLib;
 
 
-
 namespace FractalApp
 {
 
@@ -31,6 +30,7 @@ namespace FractalApp
         private Stopwatch _asmTimer;
 
 
+#if DEBUG
         [DllImport(@"C:\Users\wrobl\source\repos\projekt_JA\FractalApp\x64\Debug\FractalAsmLib.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern void GenerateJuliaFractalASM(
             byte[] result,        // tablica wynikowa
@@ -40,18 +40,19 @@ namespace FractalApp
             int startY,          // początek zakresu Y
             int endY            // koniec zakresu Y
         );
+        
 
-        //        [DllImport(@"C:\Users\wrobl\source\repos\projekt_JA\FractalApp\x64\Release\FractalAsmLib.dll", CallingConvention = CallingConvention.Cdecl)]
-        //        private static extern void GenerateJuliaFractalASM(
-        //    byte[] result,        // tablica wynikowa
-        //    double re,           // część rzeczywista C
-        //    double im,           // część urojona C
-        //    int iterations,      // max iteracji
-        //    int startY,          // początek zakresu Y
-        //    int endY            // koniec zakresu Y
-        //);
-
-
+#else
+        [DllImport(@"C:\Users\wrobl\source\repos\projekt_JA\FractalApp\x64\Release\FractalAsmLib.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern void GenerateJuliaFractalASM(
+    byte[] result,        // tablica wynikowa
+    double re,           // część rzeczywista C
+    double im,           // część urojona C
+    int iterations,      // max iteracji
+    int startY,          // początek zakresu Y
+    int endY            // koniec zakresu Y
+);
+#endif
         public MainWindow()
         {
             InitializeComponent();

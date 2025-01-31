@@ -11,9 +11,15 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\FractalAsmLib\FractalAsmLib.vcxproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Reference Include="FractalCSharpLib">
       <HintPath>..\..\FractalCSharpLib\FractalCSharpLib\bin\Debug\FractalCSharpLib.dll</HintPath>
     </Reference>
   </ItemGroup>
+
+
 
 </Project>
